@@ -2,11 +2,26 @@ const express = require("express");
 const jwt = require("jsonwebtoken");
 const { db } = require("../config/db");
 const bcrypt = require("bcrypt");
+const rateLimit = require("express-rate-limit");
 
 const router = express.Router();
 
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5,
+  message: { message: "Trop de tentatives de connexion, reessayez dans 15 minutes" },
+});
+
+const registerLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 heure
+  max: 3,
+  message: { message: "Trop de comptes crees, reessayez plus tard" },
+});
+
+const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 // register user
-router.post("/register", async (req, res) => {
+router.post("/register", registerLimiter, async (req, res) => {
   if (!req.body) {
     return res.status(400).json({
       message: "Body manquant. Envoie du JSON avec Content-Type: application/json",
@@ -17,6 +32,14 @@ router.post("/register", async (req, res) => {
 
   if (!email || !password) {
     return res.status(400).json({ message: "email et password requis" });
+  }
+
+  if (!emailRegex.test(email)) {
+    return res.status(400).json({ message: "format email invalide" });
+  }
+
+  if (password.length < 6) {
+    return res.status(400).json({ message: "le mot de passe doit faire au moins 6 caracteres" });
   }
   try {
     // Check if the user already exists
@@ -42,7 +65,13 @@ router.post("/register", async (req, res) => {
 });
 
 // login user
-router.post("/login", async (req, res) => {
+// loginLimiter is used to prevent brute-force attacks
+// by limiting the number of login attempts from a single IP address
+// within a specified time window.
+// In this case, it allows a maximum of 5 login attempts every 15 minutes.
+// If the limit is exceeded, it responds with a message indicating
+// that there have been too many login attempts and to try again later.
+router.post("/login", loginLimiter, async (req, res) => {
   if (!req.body) {
     return res.status(400).json({
       message: "Body manquant. Envoie du JSON avec Content-Type: application/json",
