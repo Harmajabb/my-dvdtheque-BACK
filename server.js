@@ -3,6 +3,7 @@ const cors = require("cors");
 require("dotenv").config();
 
 const authRoutes = require("./routes/auth");
+const dvdsRoutes = require("./routes/dvds");
 const app = express();
 
 // Middleware
@@ -12,10 +13,8 @@ app.use(express.json());
 // Routes
 app.use("/api/auth", authRoutes);
 
-// test route
-app.get("/", (_req, res) => {
-  res.send("Hello World!");
-});
+// dvd routes
+app.use("/api/dvds", dvdsRoutes);
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
