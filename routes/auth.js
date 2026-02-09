@@ -19,7 +19,6 @@ router.post("/register", async (req, res) => {
     return res.status(400).json({ message: "email et password requis" });
   }
   try {
-
     // Check if the user already exists
     const [existingUser] = await db.query("SELECT id FROM users WHERE email = ?", [email]);
     if (existingUser.length > 0) {
@@ -30,7 +29,7 @@ router.post("/register", async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
 
     // Insert the new user into the database
-    const [result] = await db.query(
+    const [_result] = await db.query(
       "INSERT INTO users (nom, email, password_hash) VALUES (?, ?, ?)",
       [nom, email, hashedPassword],
     );
@@ -57,7 +56,6 @@ router.post("/login", async (req, res) => {
   }
 
   try {
-
     // check the user
     const [user] = await db.query("SELECT * FROM users WHERE email = ?", [email]);
     if (user.length === 0) {
