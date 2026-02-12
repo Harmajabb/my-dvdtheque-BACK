@@ -37,12 +37,24 @@ router.get("/", async (req, res) => {
 router.get("/search", async (req, res) => {
   try {
     const query = req.query.q || "";
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 30));
+    const offset = (page - 1) * limit;
+
+    const searchPattern = `%${query}%`;
+    const whereClause =
+      "WHERE user_id = ? AND (titre LIKE ? OR titre_original LIKE ? OR realisateur LIKE ? OR acteurs LIKE ?)";
+    const params = [req.userId, searchPattern, searchPattern, searchPattern, searchPattern];
+
     const [dvds] = await db.query(
-      "SELECT * FROM dvds WHERE user_id = ? AND (titre LIKE ? OR titre_original LIKE ? OR realisateur LIKE ? OR acteurs LIKE ?) ORDER BY titre",
-      [req.userId, `%${query}%`, `%${query}%`, `%${query}%`, `%${query}%`],
+      `SELECT * FROM dvds ${whereClause} ORDER BY titre LIMIT ? OFFSET ?`,
+      [...params, limit, offset],
     );
 
-    res.json(dvds);
+    const [countResult] = await db.query(`SELECT COUNT(*) as total FROM dvds ${whereClause}`, params);
+    const total = countResult[0].total;
+
+    res.json({ dvds, total, page, totalPages: Math.ceil(total / limit) });
   } catch (error) {
     console.error("Error searching DVDs:", error);
     res.status(500).json({ error: "Erreur du serveur" });
@@ -80,6 +92,7 @@ router.post("/", async (req, res) => {
       annee,
       duree,
       genre,
+      nationalite,
       acteurs,
       synopsis,
       image_url,
@@ -109,7 +122,7 @@ router.post("/", async (req, res) => {
 
     // insert the new dvd into the database
     const [result] = await db.query(
-      "INSERT INTO dvds (user_id, titre, titre_original, realisateur, annee, duree, genre, acteurs, synopsis, image_url, emplacement, statut, prete_a, date_pret, notes_perso) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      "INSERT INTO dvds (user_id, titre, titre_original, realisateur, annee, duree, genre, nationalite, acteurs, synopsis, image_url, emplacement, statut, prete_a, date_pret, notes_perso) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
       [
         req.userId,
         titre,
@@ -118,6 +131,7 @@ router.post("/", async (req, res) => {
         annee,
         duree,
         genre,
+        nationalite,
         acteurs,
         synopsis,
         image_url,
@@ -150,6 +164,7 @@ router.put("/:id", async (req, res) => {
       annee,
       duree,
       genre,
+      nationalite,
       acteurs,
       synopsis,
       image_url,
@@ -183,7 +198,7 @@ router.put("/:id", async (req, res) => {
 
     // update the dvd
     await db.query(
-      "UPDATE dvds SET titre = ?, titre_original = ?, realisateur = ?, annee = ?, duree = ?, genre = ?, acteurs = ?, synopsis = ?, image_url = ?, emplacement = ?, statut = ?, prete_a = ?, date_pret = ?, notes_perso = ? WHERE id = ? AND user_id = ?",
+      "UPDATE dvds SET titre = ?, titre_original = ?, realisateur = ?, annee = ?, duree = ?, genre = ?, nationalite = ?, acteurs = ?, synopsis = ?, image_url = ?, emplacement = ?, statut = ?, prete_a = ?, date_pret = ?, notes_perso = ? WHERE id = ? AND user_id = ?",
       [
         titre,
         titre_original,
@@ -191,6 +206,7 @@ router.put("/:id", async (req, res) => {
         annee,
         duree,
         genre,
+        nationalite,
         acteurs,
         synopsis,
         image_url,

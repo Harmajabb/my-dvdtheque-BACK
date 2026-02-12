@@ -1,6 +1,7 @@
 const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
+const rateLimit = require("express-rate-limit");
 require("dotenv").config();
 
 const authRoutes = require("./routes/auth");
@@ -18,6 +19,14 @@ app.use(
   }),
 );
 app.use(express.json({ limit: "10kb" }));
+
+// global rate limiting: 100 requests per 15 minutes per IP
+const globalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  message: { error: "Trop de requetes, reessayez plus tard" },
+});
+app.use("/api", globalLimiter);
 
 // Routes
 app.use("/api/auth", authRoutes);
