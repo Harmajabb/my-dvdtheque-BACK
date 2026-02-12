@@ -1,6 +1,8 @@
 const express = require("express");
+const crypto = require("node:crypto");
 const jwt = require("jsonwebtoken");
 const { db } = require("../config/db");
+const { resend } = require("../config/resend");
 const bcrypt = require("bcrypt");
 const rateLimit = require("express-rate-limit");
 
@@ -16,6 +18,12 @@ const registerLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 heure
   max: 3,
   message: { message: "Trop de comptes crees, reessayez plus tard" },
+});
+
+const forgotPasswordLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 3,
+  message: { message: "Trop de demandes, reessayez dans 15 minutes" },
 });
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -38,8 +46,8 @@ router.post("/register", registerLimiter, async (req, res) => {
     return res.status(400).json({ message: "format email invalide" });
   }
 
-  if (password.length < 6) {
-    return res.status(400).json({ message: "le mot de passe doit faire au moins 6 caracteres" });
+  if (password.length < 8) {
+    return res.status(400).json({ message: "le mot de passe doit faire au moins 8 caracteres" });
   }
   try {
     // Check if the user already exists
@@ -105,6 +113,92 @@ router.post("/login", loginLimiter, async (req, res) => {
     res.json({ token, user: { id: userData.id, nom: userData.nom, email: userData.email } });
   } catch (error) {
     console.error("Error logging in user:", error);
+    res.status(500).json({ message: "Erreur du serveur" });
+  }
+});
+
+// forgot password - send reset email
+router.post("/forgot-password", forgotPasswordLimiter, async (req, res) => {
+  const { email } = req.body;
+
+  if (!email) {
+    return res.status(400).json({ message: "Email requis" });
+  }
+
+  try {
+    const [users] = await db.query("SELECT id FROM users WHERE email = ?", [email]);
+
+    if (users.length > 0) {
+      const user = users[0];
+      const token = crypto.randomBytes(32).toString("hex");
+      const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+      // delete old tokens for this user
+      await db.query("DELETE FROM password_resets WHERE user_id = ?", [user.id]);
+
+      await db.query(
+        "INSERT INTO password_resets (user_id, token, expires_at) VALUES (?, ?, ?)",
+        [user.id, token, expiresAt],
+      );
+
+      const resetUrl = `${process.env.FRONTEND_URL}/reset-password/${token}`;
+
+      await resend.emails.send({
+        from: process.env.RESEND_FROM_EMAIL,
+        to: email,
+        subject: "Réinitialisation de votre mot de passe - Ma DVDthèque",
+        html: `
+          <h2>Réinitialisation de mot de passe</h2>
+          <p>Vous avez demandé la réinitialisation de votre mot de passe.</p>
+          <p>Cliquez sur le lien ci-dessous pour choisir un nouveau mot de passe :</p>
+          <p><a href="${resetUrl}">Réinitialiser mon mot de passe</a></p>
+          <p>Ce lien expire dans 1 heure.</p>
+          <p>Si vous n'avez pas fait cette demande, ignorez cet email.</p>
+        `,
+      });
+    }
+
+    // always return the same response to prevent email enumeration
+    res.json({ message: "Si cet email existe, un lien de reinitialisation a ete envoye." });
+  } catch (error) {
+    console.error("Error in forgot-password:", error);
+    res.status(500).json({ message: "Erreur du serveur" });
+  }
+});
+
+// reset password with token
+router.post("/reset-password", async (req, res) => {
+  const { token, password } = req.body;
+
+  if (!token || !password) {
+    return res.status(400).json({ message: "Token et mot de passe requis" });
+  }
+
+  if (password.length < 8) {
+    return res.status(400).json({ message: "Le mot de passe doit faire au moins 8 caracteres" });
+  }
+
+  try {
+    const [resets] = await db.query(
+      "SELECT user_id FROM password_resets WHERE token = ? AND expires_at > NOW()",
+      [token],
+    );
+
+    if (resets.length === 0) {
+      return res.status(400).json({ message: "Lien invalide ou expire" });
+    }
+
+    const userId = resets[0].user_id;
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    await db.query("UPDATE users SET password_hash = ? WHERE id = ?", [hashedPassword, userId]);
+
+    // delete used token and expired tokens
+    await db.query("DELETE FROM password_resets WHERE user_id = ? OR expires_at <= NOW()", [userId]);
+
+    res.json({ message: "Mot de passe mis a jour avec succes" });
+  } catch (error) {
+    console.error("Error in reset-password:", error);
     res.status(500).json({ message: "Erreur du serveur" });
   }
 });
