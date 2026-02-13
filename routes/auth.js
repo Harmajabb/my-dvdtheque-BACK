@@ -136,10 +136,11 @@ router.post("/forgot-password", forgotPasswordLimiter, async (req, res) => {
       // delete old tokens for this user
       await db.query("DELETE FROM password_resets WHERE user_id = ?", [user.id]);
 
-      await db.query(
-        "INSERT INTO password_resets (user_id, token, expires_at) VALUES (?, ?, ?)",
-        [user.id, token, expiresAt],
-      );
+      await db.query("INSERT INTO password_resets (user_id, token, expires_at) VALUES (?, ?, ?)", [
+        user.id,
+        token,
+        expiresAt,
+      ]);
 
       const resetUrl = `${process.env.FRONTEND_URL}/reset-password/${token}`;
 
@@ -194,7 +195,9 @@ router.post("/reset-password", async (req, res) => {
     await db.query("UPDATE users SET password_hash = ? WHERE id = ?", [hashedPassword, userId]);
 
     // delete used token and expired tokens
-    await db.query("DELETE FROM password_resets WHERE user_id = ? OR expires_at <= NOW()", [userId]);
+    await db.query("DELETE FROM password_resets WHERE user_id = ? OR expires_at <= NOW()", [
+      userId,
+    ]);
 
     res.json({ message: "Mot de passe mis a jour avec succes" });
   } catch (error) {

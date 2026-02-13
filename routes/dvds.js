@@ -51,7 +51,10 @@ router.get("/search", async (req, res) => {
       [...params, limit, offset],
     );
 
-    const [countResult] = await db.query(`SELECT COUNT(*) as total FROM dvds ${whereClause}`, params);
+    const [countResult] = await db.query(
+      `SELECT COUNT(*) as total FROM dvds ${whereClause}`,
+      params,
+    );
     const total = countResult[0].total;
 
     res.json({ dvds, total, page, totalPages: Math.ceil(total / limit) });
