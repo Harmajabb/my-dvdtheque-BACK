@@ -28,6 +28,11 @@ const globalLimiter = rateLimit({
 });
 app.use("/api", globalLimiter);
 
+// Health check for deployment platforms (Railway, Render, etc.)
+app.get("/health", (_req, res) => {
+  res.status(200).json({ status: "ok" });
+});
+
 // Routes
 app.use("/api/auth", authRoutes);
 
