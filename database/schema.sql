@@ -1,10 +1,6 @@
 -- database/schema.sql
 -- SQL script to create the database and tables for the DVD collection application
 
--- Create the database
-CREATE DATABASE my_dvdtheque CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-USE my_dvdtheque;
-
 -- Table users
 CREATE TABLE users (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -42,7 +38,7 @@ CREATE TABLE dvds (
     synopsis TEXT,
     image_url VARCHAR(500),
     emplacement VARCHAR(100),
-    statut ENUM('disponible', 'prêté', 'perdu') DEFAULT 'disponible',
+    statut ENUM('en collection', 'prêté', 'perdu') DEFAULT 'en collection',
     prete_a VARCHAR(100),
     date_pret DATE,
     notes_perso TEXT,
