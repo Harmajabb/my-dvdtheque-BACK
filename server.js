@@ -8,6 +8,9 @@ const authRoutes = require("./routes/auth");
 const dvdsRoutes = require("./routes/dvds");
 const app = express();
 
+// Trust Railway/Render/Vercel reverse proxy (required for express-rate-limit behind a proxy)
+app.set("trust proxy", 1);
+
 // Middleware
 // security headers with helmet, CORS for frontend communication,
 // and JSON body parsing with a size limit to prevent abuse
